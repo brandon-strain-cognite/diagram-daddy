@@ -1,6 +1,10 @@
 {
   "manifestVersion": 1,
   "permissions": {
-    "network": []
+    "network": [
+      {
+        "sources": ["https://*.blob.core.windows.net", "https://storage.googleapis.com"]
+      }
+    ]
   }
 }

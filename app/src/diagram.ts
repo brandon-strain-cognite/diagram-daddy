@@ -3,7 +3,9 @@ import type { CogniteClient } from '@cognite/sdk';
 export const SAMPLE_SPACE = 'cardinal_samples';
 export const GLOBAL_LIBRARY_ID = 'global-3f656f67-8861-4869-a6fe-53416eb01faf';
 export const LIBRARY_NAME = 'Cardinal NORSOK Z-004';
-export const FULL_PARSE_PATH = '/api/v1/projects/{project}/diagram-parsing/parsing/full';
+export function cdfPath(project: string, resource: string): string {
+  return `/api/v1/projects/${encodeURIComponent(project)}/${resource}`;
+}
 export const PARTIAL_MATCH = false;
 
 const BETA_HEADER = { 'cdf-version': '20230101-beta' };
@@ -159,7 +161,7 @@ export function suggestionsFromEdges(edges: AnnotationEdge[]): Suggestion[] {
         label: stringMatchLabel(Number(props.confidence ?? 1)),
         page: Number(props.startNodePageNumber ?? 1),
         x: Math.min(xMin, xMax),
-        y: 1 - Math.max(yMin, yMax),
+        y: Math.min(yMin, yMax),
         width: Math.abs(xMax - xMin),
         height: Math.abs(yMax - yMin),
       },
@@ -238,21 +240,15 @@ export async function runDrawing(
   const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   const upload = options.upload ?? putPdf;
   const attempts = options.attempts ?? 36;
+  const project = client.project;
   options.onStatus?.(`Uploading ${file.name}`);
 
   await client.instances.upsert(cogniteFileUpsert(externalId, file.name));
   const created = await client.post<{ items?: { uploadUrl?: string }[] }>(
-    '/api/v1/projects/{project}/files',
+    cdfPath(project, 'files/uploadlink'),
     {
       data: {
-        items: [
-          {
-            name: file.name,
-            mimeType: 'application/pdf',
-            externalId,
-            instanceId: { space: SAMPLE_SPACE, externalId },
-          },
-        ],
+        items: [{ instanceId: { space: SAMPLE_SPACE, externalId } }],
       },
     },
   );
@@ -262,13 +258,13 @@ export async function runDrawing(
 
   options.onStatus?.(`Parsing ${file.name}`);
   const listed = await client.get<{ items?: LibraryItem[] }>(
-    '/api/v1/projects/{project}/diagram-parsing/libraries',
+    cdfPath(project, 'diagram-parsing/libraries'),
     { headers: BETA_HEADER },
   );
   let libraryId = projectLibraryId(listed.data.items ?? []);
   if (!libraryId) {
     const copied = await client.post<{ externalId?: string }>(
-      `/api/v1/projects/{project}/diagram-parsing/libraries/${GLOBAL_LIBRARY_ID}/copy`,
+      cdfPath(project, `diagram-parsing/libraries/${GLOBAL_LIBRARY_ID}/copy`),
       { data: { name: LIBRARY_NAME }, headers: BETA_HEADER },
     );
     libraryId = copied.data.externalId;
@@ -276,14 +272,14 @@ export async function runDrawing(
   if (!libraryId) throw new Error('Full parsing needs the project copy of NORSOK Z-004.');
 
   const [session] = await client.sessions.create([{ tokenExchange: true }]);
-  await client.post(FULL_PARSE_PATH, {
+  await client.post(cdfPath(project, 'diagram-parsing/parsing/full'), {
     data: fullParseBody({ libraryId, externalId, nonce: session.nonce }),
     headers: BETA_HEADER,
   });
 
   let diagrams: DiagramItem[] = [];
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const listedDiagrams = await client.get('/api/v1/projects/{project}/diagram-parsing/diagrams', {
+    const listedDiagrams = await client.get(cdfPath(project, 'diagram-parsing/diagrams'), {
       headers: BETA_HEADER,
     });
     diagrams = itemsOf<DiagramItem>(listedDiagrams.data).filter(

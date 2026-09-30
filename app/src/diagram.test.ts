@@ -6,11 +6,11 @@ import type { CogniteClient } from '@cognite/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  FULL_PARSE_PATH,
   GLOBAL_LIBRARY_ID,
   LIBRARY_NAME,
   PARTIAL_MATCH,
   SAMPLE_SPACE,
+  cdfPath,
   cogniteFileUpsert,
   fullParseBody,
   isRasterPdf,
@@ -97,7 +97,7 @@ describe('diagram parsing request', () => {
 });
 
 describe('suggested boxes', () => {
-  it('flips bottom-origin boxes onto the tag and keeps the pump-tank links', () => {
+  it('keeps top-origin boxes on the tag and keeps the pump-tank links', () => {
     const suggestions = suggestionsFromEdges(PUMP_TANK_EDGES);
 
     const texts = suggestions.map((item) => item.text);
@@ -108,11 +108,10 @@ describe('suggested boxes', () => {
     expect(suggestions.every((item) => item.label === 'String match 1.00')).toBe(true);
 
     const upperPump = suggestions.find((item) => item.id.startsWith('01f63b39'));
-    expect(upperPump?.y).toBeCloseTo(1 - 0.8737490391007595);
-    expect(upperPump?.y).not.toBeCloseTo(0.850260988297188);
+    expect(upperPump?.y).toBeCloseTo(0.850260988297188);
 
     const titlePump = suggestions.find((item) => item.id.startsWith('2a198c14'));
-    expect(titlePump?.y).toBeGreaterThan(0.9);
+    expect(titlePump?.y).toBeLessThan(0.1);
   });
 
   it('does not treat an approved edge as a new suggestion', () => {
@@ -144,6 +143,7 @@ describe('runDrawing', () => {
     const sessionCreates: unknown[] = [];
     const upload = vi.fn(() => Promise.resolve());
     const client = {
+      project: 'brandon-cardinal-dev',
       instances: {
         upsert: vi.fn(() => Promise.resolve({})),
         query: vi.fn(() => Promise.resolve({ items: { annotations: PUMP_TANK_EDGES } })),
@@ -156,7 +156,9 @@ describe('runDrawing', () => {
       },
       post: vi.fn((path: string, options: { data?: unknown }) => {
         posts.push({ path, data: options.data });
-        if (path.endsWith('/files')) return Promise.resolve({ data: { items: [{ uploadUrl: 'https://upload.example/pdf' }] } });
+        if (path.endsWith('/files/uploadlink')) {
+          return Promise.resolve({ data: { items: [{ uploadUrl: 'https://upload.example/pdf' }] } });
+        }
         if (path.endsWith('/copy')) return Promise.resolve({ data: { externalId: 'should-not-copy' } });
         return Promise.resolve({ data: [{ externalId: 'job-1' }] });
       }),
@@ -199,17 +201,24 @@ describe('runDrawing', () => {
     expect(upserted).toContain('CogniteFile');
     expect(upserted).not.toContain('CogniteAsset');
 
+    const uploadLink = posts.find((call) => call.path.endsWith('/files/uploadlink'));
+    expect(uploadLink?.data).toEqual({
+      items: [{ instanceId: { space: 'cardinal_samples', externalId: 'drop-1' } }],
+    });
+    expect(posts.some((call) => call.path.endsWith('/files'))).toBe(false);
     expect(upload).toHaveBeenCalledWith('https://upload.example/pdf', expect.any(Uint8Array));
     expect(sessionCreates).toEqual([[{ tokenExchange: true }]]);
     expect(posts.some((call) => call.path.includes('/sessions'))).toBe(false);
 
-    const parse = posts.find((call) => call.path === FULL_PARSE_PATH);
+    const parsePath = cdfPath('brandon-cardinal-dev', 'diagram-parsing/parsing/full');
+    const parse = posts.find((call) => call.path === parsePath);
+    expect(posts.every((call) => !call.path.includes('{project}'))).toBe(true);
     expect(parse?.data).toMatchObject({
       libraryId: PROJECT_LIBRARY_ID,
       partialMatch: false,
       nonce: 'nonce-from-token-exchange',
     });
-    expect(posts.filter((call) => call.path === FULL_PARSE_PATH)).toHaveLength(1);
+    expect(posts.filter((call) => call.path === parsePath)).toHaveLength(1);
     expect(posts.some((call) => call.path.endsWith('/copy'))).toBe(false);
   });
 });

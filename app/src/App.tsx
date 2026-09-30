@@ -7,15 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@cogn
 import { Loader } from '@cognite/aura/components/loader';
 
 import appConfig from '../app.json';
-import { DocumentAnnotationOverlay } from './cognite-file-viewer/DocumentAnnotationOverlay';
-import type { DocumentAnnotation } from './cognite-file-viewer/types';
-import {
-  runDrawing,
-  SAMPLE_SPACE,
-  type DrawingPipeline,
-  type DrawingResult,
-  type Suggestion,
-} from './diagram';
+import { runDrawing, type DrawingPipeline, type DrawingResult } from './diagram';
 
 const CogniteFileViewer = lazy(() =>
   import('./cognite-file-viewer/CogniteFileViewer').then((module) => ({
@@ -57,23 +49,6 @@ function visibleError(error: unknown): string {
   return message.replace(/"nonce"\s*:\s*"[^"]*"/g, '"nonce":"…"');
 }
 
-function overlayAnnotations(suggestions: Suggestion[]): DocumentAnnotation[] {
-  return suggestions.map((suggestion) => ({
-    id: suggestion.id,
-    x: suggestion.x,
-    y: suggestion.y,
-    width: suggestion.width,
-    height: suggestion.height,
-    page: suggestion.page,
-    resourceType: 'asset',
-    text: `${suggestion.text} · ${suggestion.label}`,
-    annotationType: 'diagrams.AssetLink',
-    linkedResource: suggestion.end
-      ? { space: SAMPLE_SPACE, externalId: suggestion.end }
-      : undefined,
-  }));
-}
-
 function DrawingReview({ pipeline }: { pipeline: DrawingPipeline }) {
   const client = useCogniteSdk();
   const [rejected, setRejected] = useState(false);
@@ -108,7 +83,16 @@ function DrawingReview({ pipeline }: { pipeline: DrawingPipeline }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+      <label
+        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border px-6 py-16 text-center"
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          void take(event.dataTransfer.files?.[0]);
+        }}
+      >
         <span className="text-lg">Drop a PDF</span>
         <span className="text-muted-foreground">Engineering drawing, one sheet to start.</span>
         <input
@@ -150,16 +134,8 @@ function DrawingReview({ pipeline }: { pipeline: DrawingPipeline }) {
               <CogniteFileViewer
                 source={{ type: 'instanceId', space: parsed.space, externalId: parsed.externalId }}
                 client={client}
-                showAnnotations={false}
                 fitMode="width"
                 style={{ width: '100%', height: '640px' }}
-                renderOverlay={({ width, height }) => (
-                  <DocumentAnnotationOverlay
-                    annotations={overlayAnnotations(parsed.suggestions)}
-                    containerWidth={width}
-                    containerHeight={height}
-                  />
-                )}
               />
             </Suspense>
           </div>

@@ -98,6 +98,13 @@ describe('App', () => {
     fireEvent.change(input, { target: { files: [scan] } });
     expect(await screen.findByText('This scan is not sent to full parsing.')).toBeInTheDocument();
     expect(pipeline).toHaveBeenCalledOnce();
+
+    const zone = screen.getByText('Drop a PDF').closest('label');
+    expect(zone).not.toBeNull();
+    const dropped = new File(['%PDF'], 'dropped.pdf', { type: 'application/pdf' });
+    fireEvent.drop(zone as HTMLElement, { dataTransfer: { files: [dropped] } });
+    expect(await screen.findAllByText('This scan is not sent to full parsing.')).toHaveLength(1);
+    expect(pipeline).toHaveBeenCalledTimes(2);
   });
 
   it('shows two suggested boxes for T001 and P001', async () => {

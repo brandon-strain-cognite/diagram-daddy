@@ -1,0 +1,13 @@
+.env
+.env.*
+**/.env
+**/.env.*
+.secrets
+**/.secrets
+**/*secret*
+**/credentials*.json
+**/*credentials*
+**/*.pem
+**/*.key
+.cognite/
+**/.cognite/

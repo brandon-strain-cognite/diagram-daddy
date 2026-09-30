@@ -1,0 +1,15 @@
+.env
+.env.*
+**/.env
+**/.env.*
+.secrets
+**/.secrets
+**/*secret*
+**/credentials*.json
+**/*credentials*
+**/*.pem
+**/*.key
+.cognite/
+node_modules/
+dist/
+.DS_Store

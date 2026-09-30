@@ -19,6 +19,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
+  },
   server: {
     port: 3001,
   },

@@ -5,6 +5,11 @@ import { CogniteClient } from '@cognite/sdk';
 import type { ComponentProps } from 'react';
 
 import App from './App';
+import type { DrawingResult, Suggestion } from './diagram';
+
+vi.mock('./cognite-file-viewer/CogniteFileViewer', () => ({
+  CogniteFileViewer: () => <div>PDF preview</div>,
+}));
 
 type AppDeps = NonNullable<ComponentProps<typeof App>['deps']>;
 
@@ -31,6 +36,33 @@ function makeLoadingDeps(): AppDeps {
   };
 }
 
+function suggestion(id: string, text: string): Suggestion {
+  return {
+    id,
+    text,
+    end: text,
+    label: 'String match 1.00',
+    page: 1,
+    x: 0.1,
+    y: 0.2,
+    width: 0.04,
+    height: 0.02,
+  };
+}
+
+const parsed: DrawingResult = {
+  kind: 'parsed',
+  space: 'cardinal_samples',
+  externalId: 'drop-1',
+  name: 'pump-tank.pdf',
+  suggestions: [
+    suggestion('a', 'T001'),
+    suggestion('b', 'T001'),
+    suggestion('c', 'P001'),
+    suggestion('d', 'P001'),
+  ],
+};
+
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,21 +79,41 @@ describe('App', () => {
     expect(screen.getByText('Drop a PDF')).toBeInTheDocument();
     expect(screen.getByText('cog-brandon')).toBeInTheDocument();
     expect(screen.getByText('brandon-cardinal-dev')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /parse again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
   });
 
-  it('shows the selected PDF and rejects other files', async () => {
-    render(<App deps={makeDeps()} />);
+  it('rejects other files and does not parse a scan with full parsing', async () => {
+    const pipeline = vi.fn(() => Promise.resolve({ kind: 'raster' } as const));
+    render(<App deps={makeDeps()} pipeline={pipeline} />);
     await waitFor(() => expect(screen.getByLabelText(/Drop a PDF/)).toBeInTheDocument());
     const input = screen.getByLabelText(/Drop a PDF/);
 
     const notes = new File(['hello'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(input, { target: { files: [notes] } });
     expect(screen.getByText('Choose a PDF.')).toBeInTheDocument();
-    expect(screen.queryByText('Selected notes.txt')).not.toBeInTheDocument();
+    expect(pipeline).not.toHaveBeenCalled();
 
-    const drawing = new File(['%PDF'], 'pump-tank.pdf', { type: 'application/pdf' });
-    fireEvent.change(input, { target: { files: [drawing] } });
-    expect(screen.getByText('Selected pump-tank.pdf')).toBeInTheDocument();
-    expect(screen.queryByText('Choose a PDF.')).not.toBeInTheDocument();
+    const scan = new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [scan] } });
+    expect(await screen.findByText('This scan is not sent to full parsing.')).toBeInTheDocument();
+    expect(pipeline).toHaveBeenCalledOnce();
+  });
+
+  it('shows two suggested boxes for T001 and P001', async () => {
+    const pipeline = vi.fn(() => Promise.resolve(parsed));
+    render(<App deps={makeDeps()} pipeline={pipeline} />);
+    await waitFor(() => expect(screen.getByLabelText(/Drop a PDF/)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/Drop a PDF/), {
+      target: { files: [new File(['%PDF'], 'pump-tank.pdf', { type: 'application/pdf' })] },
+    });
+
+    expect(await screen.findAllByText('T001 · String match 1.00 · Suggested')).toHaveLength(2);
+    expect(screen.getAllByText('P001 · String match 1.00 · Suggested')).toHaveLength(2);
+    expect(screen.queryByText(/STORAGE TANK/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/FEED PUMP/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /parse again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
+    expect(await screen.findByText('PDF preview')).toBeInTheDocument();
   });
 });

@@ -1,0 +1,16 @@
+{
+  "name": "Diagram Daddy",
+  "description": "Drop an engineering drawing, review suggested tags, and approve links.",
+  "externalId": "diagram-daddy",
+  "versionTag": "0.0.1",
+  "infra": "appsApi",
+  "deployments": [
+    {
+      "org": "cog-brandon",
+      "project": "brandon-cardinal-dev",
+      "baseUrl": "https://orangefield.cognitedata.com",
+      "deployClientId": "",
+      "deploySecretName": "COG_BRANDON_BRANDON_CARDINAL_DEV_ORANGEFIELD"
+    }
+  ]
+}

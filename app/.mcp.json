@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cognite-docs": {
+      "type": "http",
+      "url": "https://docs.cognite.com/mcp"
+    }
+  }
+}

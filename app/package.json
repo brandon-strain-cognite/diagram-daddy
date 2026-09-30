@@ -1,0 +1,63 @@
+{
+  "name": "app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20 <22.23.0 || >=22.23.1 <24.17.0 || >=24.18.0 <26.3.1 || >=26.4.0",
+    "npm": ">=11.10.0"
+  },
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --ext .js,.mjs,.cjs,.ts,.tsx",
+    "lint:fix": "eslint . --fix --ext .js,.mjs,.cjs,.ts,.tsx",
+    "deploy": "npx @cognite/cli@latest apps deploy --interactive",
+    "activate": "npx @cognite/cli@latest apps activate --interactive",
+    "setup-https": "npx @cognite/cli@latest apps setup-https"
+  },
+  "dependencies": {
+    "@cognite/aura": "^0.3.5",
+    "@cognite/sdk": "^10.10.0",
+    "@cognite/app-sdk": "^0.9.0",
+    "@tabler/icons-react": "^3.35.0",
+    "@tanstack/react-query": "^5.90.10",
+    "clsx": "^2.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@tailwindcss/vite": "^4.1.17",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^26.0.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": ">=5.1.1 <6.0.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/ui": "4.1.10",
+    "autoprefixer": "^10.4.22",
+    "eslint": "9.39.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-no-only-tests": "^3.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.0.0",
+    "happy-dom": "^20.9.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.46.4",
+    "vite": ">=7.3.5 <8.0.0",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "cognite-docs": {
+      "url": "https://docs.cognite.com/mcp"
+    }
+  }
+}

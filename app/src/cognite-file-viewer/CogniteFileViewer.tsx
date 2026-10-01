@@ -121,7 +121,7 @@ function ImageRenderer(props: ImageRendererProps) {
   // Until we know image dimensions, render hidden to measure
   if (!imgWidth || !naturalSize) {
     return (
-      <div ref={viewportRef} style={{ overflow: 'hidden' }}>
+      <div ref={viewportRef} style={{ overflow: 'hidden', width: '100%', height: '100%' }}>
         {renderLoading ? renderLoading() : <DefaultLoading />}
         <img
           src={blobUrl}
@@ -139,7 +139,11 @@ function ImageRenderer(props: ImageRendererProps) {
   const visualH = (isSwapped ? imgWidth : imgHeight) * currentZoom;
 
   return (
-    <div ref={viewportRef} style={{ overflow: currentZoom > 1 ? 'hidden' : 'auto', cursor }} onMouseDown={handleMouseDown}>
+    <div
+      ref={viewportRef}
+      style={{ overflow: currentZoom > 1 ? 'hidden' : 'auto', cursor, width: '100%', height: '100%' }}
+      onMouseDown={handleMouseDown}
+    >
       <div
         style={{
           display: 'inline-block',

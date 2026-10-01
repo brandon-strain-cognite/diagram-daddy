@@ -1,15 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HostAppAPI, ConnectToHostAppResult } from '@cognite/app-sdk';
 import { CogniteClient } from '@cognite/sdk';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import App from './App';
-import type { DrawingResult, Suggestion } from './diagram';
-
-vi.mock('./cognite-file-viewer/CogniteFileViewer', () => ({
-  CogniteFileViewer: () => <div>PDF preview</div>,
-}));
+import App, { type ReviewActions } from './App';
+import type { ProjectDrawing, ReviewStatus } from './review';
 
 type AppDeps = NonNullable<ComponentProps<typeof App>['deps']>;
 
@@ -36,32 +32,27 @@ function makeLoadingDeps(): AppDeps {
   };
 }
 
-function suggestion(id: string, text: string): Suggestion {
+const drawings: ProjectDrawing[] = [
+  { id: 1, space: 'cardinal_samples', externalId: 'sheet-1', name: 'Sheet 1.pdf' },
+  { id: 2, space: 'cardinal_samples', externalId: 'sheet-2', name: 'Sheet 2.tif' },
+];
+
+function makeActions(initial: ReviewStatus): Partial<ReviewActions> & { current: ReviewStatus } {
+  const state = { current: initial };
   return {
-    id,
-    text,
-    end: text,
-    label: 'String match 1.00',
-    page: 1,
-    x: 0.1,
-    y: 0.2,
-    width: 0.04,
-    height: 0.02,
+    current: initial,
+    drawings: () => Promise.resolve(drawings),
+    status: () => Promise.resolve(state.current),
+    stage: vi.fn(() => {
+      state.current = { ...state.current, staged: 42 };
+      return Promise.resolve(42);
+    }),
+    finish: vi.fn(() => {
+      state.current = { staged: 3, suggested: 0, approved: 3, rejected: 0 };
+      return Promise.resolve({ keep: [], remove: ['a', 'b'], verified: 3, discarded: 39 });
+    }),
   };
 }
-
-const parsed: DrawingResult = {
-  kind: 'parsed',
-  space: 'cardinal_samples',
-  externalId: 'drop-1',
-  name: 'pump-tank.pdf',
-  suggestions: [
-    suggestion('a', 'T001'),
-    suggestion('b', 'T001'),
-    suggestion('c', 'P001'),
-    suggestion('d', 'P001'),
-  ],
-};
 
 describe('App', () => {
   beforeEach(() => {
@@ -73,54 +64,29 @@ describe('App', () => {
     expect(screen.getByText('Loading project...')).toBeInTheDocument();
   });
 
-  it('renders a PDF drop target for cog-brandon', async () => {
-    render(<App deps={makeDeps()} />);
-    await waitFor(() => expect(screen.getByText('Diagram Daddy')).toBeInTheDocument());
-    expect(screen.getByText('Drop a PDF')).toBeInTheDocument();
+  it('lists drawings for cog-brandon', async () => {
+    render(<App deps={makeDeps()} actions={makeActions({ staged: 0, suggested: 0, approved: 0, rejected: 0 })} />);
+    expect(await screen.findByRole('button', { name: 'Sheet 1.pdf' })).toBeInTheDocument();
     expect(screen.getByText('cog-brandon')).toBeInTheDocument();
-    expect(screen.getByText('brandon-cardinal-dev')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /parse again/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sheet 2.tif' })).toBeInTheDocument();
   });
 
-  it('rejects other files and does not parse a scan with full parsing', async () => {
-    const pipeline = vi.fn(() => Promise.resolve({ kind: 'raster' } as const));
-    render(<App deps={makeDeps()} pipeline={pipeline} />);
-    await waitFor(() => expect(screen.getByLabelText(/Drop a PDF/)).toBeInTheDocument());
-    const input = screen.getByLabelText(/Drop a PDF/);
-
-    const notes = new File(['hello'], 'notes.txt', { type: 'text/plain' });
-    fireEvent.change(input, { target: { files: [notes] } });
-    expect(screen.getByText('Choose a PDF.')).toBeInTheDocument();
-    expect(pipeline).not.toHaveBeenCalled();
-
-    const scan = new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' });
-    fireEvent.change(input, { target: { files: [scan] } });
-    expect(await screen.findByText('This scan is not sent to full parsing.')).toBeInTheDocument();
-    expect(pipeline).toHaveBeenCalledOnce();
-
-    const zone = screen.getByText('Drop a PDF').closest('label');
-    expect(zone).not.toBeNull();
-    const dropped = new File(['%PDF'], 'dropped.pdf', { type: 'application/pdf' });
-    fireEvent.drop(zone as HTMLElement, { dataTransfer: { files: [dropped] } });
-    expect(await screen.findAllByText('This scan is not sent to full parsing.')).toHaveLength(1);
-    expect(pipeline).toHaveBeenCalledTimes(2);
+  it('stages candidates, shows review counts, and finishes the review', async () => {
+    const actions = makeActions({ staged: 0, suggested: 0, approved: 0, rejected: 0 });
+    render(<App deps={makeDeps()} actions={actions} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sheet 1.pdf' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Stage candidates' }));
+    await waitFor(() => expect(actions.stage).toHaveBeenCalledOnce());
+    expect(await screen.findByText('42 candidates staged for this drawing.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Finish review' }));
+    await waitFor(() => expect(actions.finish).toHaveBeenCalledOnce());
+    expect(await screen.findByText('Kept 3 verified · removed 2 candidates.')).toBeInTheDocument();
   });
 
-  it('shows two suggested boxes for T001 and P001', async () => {
-    const pipeline = vi.fn(() => Promise.resolve(parsed));
-    render(<App deps={makeDeps()} pipeline={pipeline} />);
-    await waitFor(() => expect(screen.getByLabelText(/Drop a PDF/)).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/Drop a PDF/), {
-      target: { files: [new File(['%PDF'], 'pump-tank.pdf', { type: 'application/pdf' })] },
-    });
-
-    expect(await screen.findAllByText('T001 · String match 1.00 · Suggested')).toHaveLength(2);
-    expect(screen.getAllByText('P001 · String match 1.00 · Suggested')).toHaveLength(2);
-    expect(screen.queryByText(/STORAGE TANK/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/FEED PUMP/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /parse again/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
-    expect(await screen.findByText('PDF preview')).toBeInTheDocument();
+  it('warns that unreviewed boxes will be treated as rejected', async () => {
+    render(<App deps={makeDeps()} actions={makeActions({ staged: 10, suggested: 4, approved: 2, rejected: 4 })} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sheet 1.pdf' }));
+    expect(await screen.findByText(/4 boxes are still unreviewed/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Review counts')).toHaveTextContent('4 suggested · 2 verified · 4 rejected');
   });
 });

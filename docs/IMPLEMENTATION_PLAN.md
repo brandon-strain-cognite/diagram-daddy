@@ -509,13 +509,30 @@ Exit gate:
 
 ### Phase 8 — later register reconciliation
 
-**Goal:** align the P&ID-derived register with a later source of truth.
+**Goal:** align the P&ID-derived register with a later source of truth, and stop
+hand-rolling steady-state diagram linking.
 
 Work:
 
-- Configure CDF Entity matching.
+- Deploy the Cognite library module
+  [`cdf_p_and_id_annotation`](https://github.com/cognitedata/library/tree/main/modules/contextualization/cdf_p_and_id_annotation)
+  so new drawings are linked to the register Cardinal already created.
+- Reuse its deterministic annotation external IDs, Data Modeling annotation
+  payload, incremental file sync, and extraction-pipeline workflow.
+- Configure CDF Entity matching only when a second register or a sensor list
+  exists. The library module
+  [`cdf_entity_matching`](https://github.com/cognitedata/library/tree/main/modules/contextualization/cdf_entity_matching)
+  matches time series to assets; it does not create the first register.
 - Review candidate matches and preserve both source identities.
 - Merge or relate records according to data ownership rules.
+
+Do not deploy these modules for bootstrap. Both diagram modules search for
+assets and files that already exist, and their default is threshold
+auto-approval. That violates the human write boundary. Borrow the manual
+pattern catalog from
+[`cdf_file_annotation`](https://github.com/cognitedata/library/tree/main/modules/contextualization/cdf_file_annotation)
+only as a store for tag-shape samples. Do not enable its pattern auto-promotion
+during bootstrap.
 
 This phase is intentionally after bootstrap asset creation.
 

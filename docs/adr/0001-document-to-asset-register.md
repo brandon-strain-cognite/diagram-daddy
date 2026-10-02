@@ -141,7 +141,18 @@ annotations preserve clickability, identity, and review provenance.
 ### Run Entity matching first
 
 Rejected. Entity matching requires another entity collection. It is useful only
-after the P&ID-derived register or another master source exists.
+after the P&ID-derived register or another master source exists. The library
+module `cdf_entity_matching` matches time series to existing assets. It is a
+Phase 8 tool, not the bootstrap.
+
+### Deploy `cdf_p_and_id_annotation` as the reader
+
+Rejected for bootstrap. Accepted for steady state. That module, and
+`cdf_file_annotation`, find tags that already exist as assets or files and can
+auto-approve them. After Cardinal has created the register, deploy
+`cdf_p_and_id_annotation` for new drawings instead of extending the local
+full-parsing path. Reuse its annotation ID scheme and write payload. Do not use
+its auto-approval threshold while a human must still confirm new tags.
 
 ## Follow-up decisions
 
